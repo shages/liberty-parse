@@ -10,6 +10,20 @@ use nom::{
     Err, IResult,
 };
 
+struct Group {
+    name: String,
+    type_: String,
+    attributes: Vec<Attr>,
+    groups: Vec<Group>,
+}
+
+pub enum Attr {
+    // name, value
+    Simple(String, Value),
+    // name, value
+    Complex(String, Vec<Value>),
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum GroupItem {
     // type, name, values
