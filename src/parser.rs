@@ -1,60 +1,16 @@
-use crate::error::Error;
+use crate::ast::{GroupItem, Value};
+
 use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, tag, take_until, take_while},
     character::complete::{alpha1, char, line_ending, multispace0, one_of},
     combinator::{all_consuming, cut, map, map_res, opt, peek, recognize},
-    error::{context, ParseError, VerboseError},
+    error::{context, ParseError},
     multi::{fold_many0, separated_list},
     number::complete::double,
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use std::result;
-
-pub type Result<'a, T> = result::Result<T, Error<'a>>;
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum GroupItem {
-    // type, name, values
-    Group(String, String, Vec<GroupItem>),
-    // name, value
-    SimpleAttr(String, Value),
-    // name, value
-    ComplexAttr(String, Vec<Value>),
-    // contents
-    Comment(String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Value {
-    // boolean value
-    Bool(bool),
-    // floating point value
-    Float(f64),
-    // group of floating point values in quotation marks
-    FloatGroup(Vec<f64>),
-    // string enclosed in quotation marks
-    String(String),
-    // Expression
-    Expression(String),
-}
-
-pub struct Parser<'a> {
-    input: &'a str,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str) -> Self {
-        Parser { input: input }
-    }
-
-    pub fn parse(&self) -> Result<Vec<GroupItem>> {
-        parse_libs::<VerboseError<&str>>(self.input)
-            .map_err(|e| Error::new(self.input, e))
-            .map(|(_, libs)| libs)
-    }
-}
 
 fn underscore_tag<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, &str, E> {
     context(
@@ -234,8 +190,6 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                 preceded(
                     preceded(multispace0, char('(')),
                     terminated(
-                        // preceded(multispace0, alt((quoted_string, underscore_tag))),
-                        // delimited(multispace0, is_not(")"), multispace0),
                         map(
                             separated_list(
                                 preceded(multispace0, char(',')),
@@ -258,6 +212,7 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
         ),
     )(input)
 }
+
 pub fn parse_libs<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Vec<GroupItem>, E> {
     context(
         "parse_libs",
@@ -689,17 +644,4 @@ library(foo) {
         );
     }
 
-    macro_rules! parse_file {
-        ($fname:ident) => {{
-            let data = include_str!(concat!("../data/", stringify!($fname), ".lib"));
-            Parser::new(data).parse().unwrap()
-        }};
-    }
-
-    #[test]
-    fn test_files() {
-        parse_file!(small);
-        parse_file!(cells);
-        parse_file!(cells_timing);
-    }
 }

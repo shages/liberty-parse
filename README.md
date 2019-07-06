@@ -7,7 +7,7 @@ Liberty file format parser for Rust
 Parse libraries from a Liberty file
 
 ```rust
-use liberty_parse::{Parser, GroupItem};
+use liberty_parse::parse_lib;
 
 let lib_str = r#"
 library(sample) {
@@ -17,22 +17,13 @@ library(sample) {
 }
 "#;
 
-for lib in Parser::new(lib_str).parse()? {
-    match lib {
-        GroupItem::Group(type_, name, items) => {
-            println!(
-                "Library '{}' has {} cells", 
-                name, 
-                items
-                    .iter()
-                    .filter(|g| match g {
-                        GroupItem::Group(type_, _ ,_) => type_ == "cell",
-                        _ => false
-                    })
-                    .count()
-            );
-        }
-        _ => {}
+for lib in parse_lib(lib_str).unwrap() {
+    println!("Library '{}' has {} cells", lib.name, lib.cells.len());
+    if let Some(cell) = lib.cells.get("AND2") {
+        let area = cell.simple_attributes.get("area").map_or(0.0, |v| v.float());
+        println!("Cell AND2 has area: {}", area);
+    } else {
+        println!("Cell AND2 doesn't exist!");
     }
 }
 ```
