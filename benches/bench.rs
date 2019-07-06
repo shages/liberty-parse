@@ -1,10 +1,8 @@
 #[macro_use]
 extern crate criterion;
 
-use liberty_parse::parse_libs;
-use nom::error::ErrorKind;
+use liberty_parse::Parser;
 
-use criterion::black_box;
 use criterion::Criterion;
 
 macro_rules! my_bench_file {
@@ -12,7 +10,9 @@ macro_rules! my_bench_file {
         fn $fname(c: &mut Criterion) {
             let data = include_str!(concat!("../data/", stringify!($fname), ".lib"));
             c.bench_function(stringify!($fname), move |b| {
-                b.iter(|| parse_libs::<(&str, ErrorKind)>(data))
+                b.iter(|| match Parser::new(data).parse() {
+                    _ => {}
+                })
             });
         }
     };

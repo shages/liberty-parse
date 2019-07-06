@@ -1,29 +1,36 @@
 # liberty-parse
 
-Liberty file format parser
+Liberty file format parser for Rust
 
 ## Example usage
 
-Parse a liberty file into the Library
+Parse libraries from a Liberty file
 
 ```rust
-use liberty_parse;
+use liberty_parse::{Parser, GroupItem};
 
-let lib_str = "...";
-let library = liberty_parse::parse_libs(lib_str);
+let lib_str = r#"
+library(sample) {
+    cell(AND2) {
+        area: 1;
+    }
+}
+"#;
 
-println!("Found {} libraries", library.len());
-for lib in library {
+for lib in Parser::new(lib_str).parse()? {
     match lib {
-        liberty_parse::Item::Group(name, items) => {
-            let groups = items
-                .iter()
-                .filter(|i| match i {
-                    liberty_parse::Item::Group => true,
-                    _ => false
-                })
-                .collect();
-            println!("Library {} has {} groups", name, groups.len());
+        GroupItem::Group(type_, name, items) => {
+            println!(
+                "Library '{}' has {} cells", 
+                name, 
+                items
+                    .iter()
+                    .filter(|g| match g {
+                        GroupItem::Group(type_, _ ,_) => type_ == "cell",
+                        _ => false
+                    })
+                    .count()
+            );
         }
         _ => {}
     }
@@ -33,11 +40,10 @@ for lib in library {
 ## Limitations
 
 - Doesn't automatically parse files from `include` statements
+- Doesn't parse bus syntax in pin names. For example:
 
-## Use cases
-
-- (1) Read selective information for scripting: Cell names, cell attributes (ex: function, footprint, etc.), cell/pin names
-- (2) Read most information for timing and power calculations (better stored in a database format?)
-- (N - not focus) Construct entire Liberty file: Write Liberty from characterization or design database
-- (N - niche use) Read, modify, and write-back: Scale values, or similar?
+  ```
+      pin (X[0:3]){
+      }
+  ```
 
