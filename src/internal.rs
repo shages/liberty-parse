@@ -2,12 +2,12 @@ use crate::error::Error;
 use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, tag, take_until, take_while},
-    character::complete::{alpha1, char, digit1, line_ending, multispace0, one_of},
-    combinator::{all_consuming, cut, map, map_res, not, opt, peek, recognize},
+    character::complete::{alpha1, char, line_ending, multispace0, one_of},
+    combinator::{all_consuming, cut, map, map_res, opt, peek, recognize},
     error::{context, ParseError, VerboseError},
     multi::{fold_many0, separated_list},
     number::complete::double,
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 use std::result;
@@ -30,8 +30,6 @@ pub enum GroupItem {
 pub enum Value {
     // boolean value
     Bool(bool),
-    // signed integer value
-    Int(i64),
     // floating point value
     Float(f64),
     // group of floating point values in quotation marks
@@ -115,12 +113,6 @@ fn quoted_string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, &s
     )(input)
 }
 
-fn integer<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, i64, E> {
-    map_res(recognize(pair(opt(char('-')), digit1)), |s: &str| {
-        s.parse::<i64>()
-    })(input)
-}
-
 fn boolean<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, bool, E> {
     map_res(alpha1, |s: &str| s.parse::<bool>())(input)
 }
@@ -133,8 +125,7 @@ fn simple_attr_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str
             alt((
                 map(quoted_floats, Value::FloatGroup),
                 map(quoted_string, |s| Value::String(s.to_string())),
-                map(terminated(integer, peek(not(char('.')))), Value::Int),
-                map(terminated(double, peek(one_of(" \t\r\n,;)"))), Value::Float),
+                map(terminated(double, peek(one_of(",; \t)"))), Value::Float),
                 map(boolean, Value::Bool),
                 map(map(expression, String::from), Value::Expression),
             )),
@@ -332,8 +323,8 @@ mod tests {
             Ok(("", vec![Value::String("a string(b)".to_string())]))
         );
         assert_eq!(
-            complex_attribute_values::<VerboseError<&str>>("(123,456)"),
-            Ok(("", vec![Value::Int(123), Value::Int(456),]))
+            complex_attribute_values::<VerboseError<&str>>("(123,-456)"),
+            Ok(("", vec![Value::Float(123.0), Value::Float(-456.0),]))
         );
     }
 
@@ -345,7 +336,7 @@ mod tests {
                 "",
                 GroupItem::ComplexAttr(
                     "capacitive_load_unit".to_string(),
-                    vec![Value::Int(1), Value::Expression("pf".to_string()),],
+                    vec![Value::Float(1.0), Value::Expression("pf".to_string()),],
                 )
             ))
         );
@@ -472,14 +463,14 @@ line
             simple_attribute::<(&str, ErrorKind)>("attr_name : 345 ; "),
             Ok((
                 " ",
-                GroupItem::SimpleAttr(String::from("attr_name"), Value::Int(345),)
+                GroupItem::SimpleAttr(String::from("attr_name"), Value::Float(345.0),)
             ))
         );
         assert_eq!(
             simple_attribute::<(&str, ErrorKind)>("attr_name : -345 ; "),
             Ok((
                 " ",
-                GroupItem::SimpleAttr(String::from("attr_name"), Value::Int(-345),)
+                GroupItem::SimpleAttr(String::from("attr_name"), Value::Float(-345.0),)
             ))
         );
     }
@@ -590,7 +581,7 @@ line
                     "foo".to_string(),
                     vec![GroupItem::ComplexAttr(
                         "abc".to_string(),
-                        vec![Value::Int(1), Value::Int(2), Value::Int(3),],
+                        vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0),],
                     ),],
                 ),
             ))
@@ -622,7 +613,7 @@ line
                             "inner".to_string(),
                             vec![GroupItem::ComplexAttr(
                                 "abc".to_string(),
-                                vec![Value::Int(1), Value::Int(2), Value::Int(3),],
+                                vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0),],
                             ),],
                         ),
                         GroupItem::Group(
@@ -630,7 +621,7 @@ line
                             "inner2".to_string(),
                             vec![GroupItem::ComplexAttr(
                                 "abc".to_string(),
-                                vec![Value::Int(1), Value::Int(2), Value::Int(3),],
+                                vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0),],
                             ),],
                         ),
                     ]
@@ -681,7 +672,7 @@ library(foo) {
                         ),
                         GroupItem::ComplexAttr(
                             "capacitive_load_unit".to_string(),
-                            vec![Value::Int(1), Value::Expression("pf".to_string()),],
+                            vec![Value::Float(1.0), Value::Expression("pf".to_string()),],
                         ),
                         GroupItem::SimpleAttr(
                             "function".to_string(),
@@ -689,7 +680,7 @@ library(foo) {
                         ),
                         GroupItem::SimpleAttr(
                             "slew_upper_threshold_pct_rise".to_string(),
-                            Value::Int(80)
+                            Value::Float(80.0)
                         ),
                         GroupItem::SimpleAttr("nom_temperature".to_string(), Value::Float(25.0)),
                     ],
