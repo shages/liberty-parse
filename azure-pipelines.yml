@@ -11,7 +11,9 @@ strategy:
       imageName: 'macos-10.13'
 
 trigger:
-- azure-pipelines
+  branches:
+    include: 
+    - '*'
 
 pool:
   vmImage: $(imageName)
