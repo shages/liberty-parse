@@ -1,8 +1,15 @@
 [package]
 name = "liberty-parse"
+description = "Liberty file format parser"
 version = "0.1.0"
 authors = ["Erik Ronshagen <eronshagen@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/shages/liberty-parse"
+readme = "README.md"
+license = "MIT"
+
+[badges]
+azure-devops = { project = "eronshagen/shages", pipeline = "shages.liberty-parse" }
 
 [dependencies]
 nom = "5.0.0"
