@@ -37,7 +37,7 @@ library(sample) {
             .and_then(|t| t.groups.iter().find(|g| g.type_ == "cell_rise"))
             .and_then(|rise| rise.complex_attributes.get("values"))
             .map_or(vec![], |values| {
-                values.into_iter().map(|v| v.float_group()).collect()
+                values.iter().map(|v| v.float_group()).collect()
             });
         println!("Pin AND2/o has cell_rise values: {:?}", values);
     }

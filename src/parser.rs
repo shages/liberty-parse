@@ -208,7 +208,7 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                     )),
                 ),
             )),
-            |(gtype, name, body)| GroupItem::Group(gtype.to_string(), name.to_string(), body),
+            |(gtype, name, body)| GroupItem::Group(gtype.to_string(), name, body),
         ),
     )(input)
 }
@@ -643,5 +643,4 @@ library(foo) {
             ))
         );
     }
-
 }

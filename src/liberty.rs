@@ -6,7 +6,7 @@
 //! * `cell` and `pin` groups are brought out into [HashMap](std::collections::HashMap)s so they're
 //!   easier to work with
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use crate::ast::{GroupItem, LibertyAst, Value};
 
@@ -30,6 +30,18 @@ impl Liberty {
                 .map(|g| Library::from_group(Group::from_group_item(g)))
                 .collect(),
         )
+    }
+}
+
+impl From<LibertyAst> for Liberty {
+    fn from(ast: LibertyAst) -> Self {
+        Liberty::from_ast(ast)
+    }
+}
+
+impl fmt::Display for Liberty {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.clone().to_ast().fmt(f)
     }
 }
 
@@ -112,11 +124,11 @@ impl Group {
             }
         }
         Self {
-            name: name,
-            type_: type_,
-            simple_attributes: simple_attributes,
-            complex_attributes: complex_attributes,
-            groups: groups,
+            name,
+            type_,
+            simple_attributes,
+            complex_attributes,
+            groups,
         }
     }
 
@@ -207,7 +219,7 @@ impl FromGroup for Library {
             name: group.name,
             simple_attributes: group.simple_attributes,
             complex_attributes: group.complex_attributes,
-            groups: groups,
+            groups,
             cells: cells.into_iter().fold(HashMap::new(), |mut acc, cell| {
                 acc.insert(cell.name.clone(), Cell::from_group(cell));
                 acc
@@ -227,7 +239,7 @@ impl ToGroup for Library {
             type_: String::from("library"),
             simple_attributes: self.simple_attributes,
             complex_attributes: self.complex_attributes,
-            groups: groups,
+            groups,
         }
     }
 }
@@ -240,7 +252,7 @@ impl FromGroup for Cell {
             name: group.name,
             simple_attributes: group.simple_attributes,
             complex_attributes: group.complex_attributes,
-            groups: groups,
+            groups,
             pins: pins.into_iter().fold(HashMap::new(), |mut acc, pin| {
                 acc.insert(pin.name.clone(), Pin::from_group(pin));
                 acc
@@ -261,7 +273,7 @@ impl ToGroup for Cell {
             type_: String::from("cell"),
             simple_attributes: self.simple_attributes,
             complex_attributes: self.complex_attributes,
-            groups: groups,
+            groups,
         }
     }
 }

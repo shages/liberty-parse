@@ -27,8 +27,8 @@
 //! ```
 
 pub mod ast;
-pub mod liberty;
 mod error;
+pub mod liberty;
 mod parser;
 
 pub use ast::{ParseResult, Value};
