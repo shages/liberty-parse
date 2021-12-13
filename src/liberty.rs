@@ -232,8 +232,8 @@ impl ToGroup for Library {
     type Item = Library;
     fn into_group(self) -> Group {
         let mut groups: Vec<Group> = Vec::with_capacity(self.groups.len() + self.cells.len());
-        groups.extend(self.cells.into_iter().map(|(_, cell)| cell.into_group()));
         groups.extend(self.groups);
+        groups.extend(self.cells.into_iter().map(|(_, cell)| cell.into_group()));
         Group {
             name: self.name,
             type_: String::from("library"),
