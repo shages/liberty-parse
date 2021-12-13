@@ -67,7 +67,7 @@ fn items_to_string(items: &[GroupItem], level: usize) -> String {
                 format!("{}{} : {};", indent, name, value.to_string())
             }
             GroupItem::ComplexAttr(name, values) => format!(
-                "{}{} ({})",
+                "{}{} ({});",
                 indent,
                 name,
                 values.iter().map(|v| v.to_string()).join(", ")
