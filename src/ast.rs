@@ -47,7 +47,7 @@ impl LibertyAst {
 
 impl fmt::Display for LibertyAst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", items_to_string(&self.0))
+        write!(f, "{}", items_to_string(&self.0, 0))
     }
 }
 
@@ -58,22 +58,28 @@ impl From<Liberty> for LibertyAst {
 }
 
 // Recursively convert a vector of [`GroupItem`]s into a single `String`
-fn items_to_string(items: &[GroupItem]) -> String {
+fn items_to_string(items: &[GroupItem], level: usize) -> String {
+    let indent = "  ".repeat(level);
     items
         .iter()
         .map(|item| match item {
-            GroupItem::SimpleAttr(name, value) => format!("{} : {};\n", name, value.to_string()),
+            GroupItem::SimpleAttr(name, value) => {
+                format!("{}{} : {};", indent, name, value.to_string())
+            }
             GroupItem::ComplexAttr(name, values) => format!(
-                "{} (\n{}\n)\n",
+                "{}{} ({})",
+                indent,
                 name,
                 values.iter().map(|v| v.to_string()).join(", ")
             ),
             GroupItem::Comment(v) => format!("/*\n{}\n*/", v),
             GroupItem::Group(type_, name, group_items) => format!(
-                "{} ( {} ) {{\n{}\n}}",
+                "{}{} ( {} ) {{\n{}\n{}}}",
+                indent,
                 type_,
                 name,
-                items_to_string(group_items)
+                items_to_string(group_items, level + 1),
+                indent
             ),
         })
         .join("\n")
