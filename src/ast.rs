@@ -157,11 +157,14 @@ impl fmt::Display for Value {
                     write!(f, "false")
                 }
             }
-            Value::Float(v) => write!(f, "{}", PrettyPrintFloat(*v)),
+            Value::Float(v) => write!(f, "{:.10}", PrettyPrintFloat(*v)),
             Value::FloatGroup(v) => write!(
                 f,
                 "\"{}\"",
-                format!("{}", v.iter().map(|x| PrettyPrintFloat(*x)).format(", "))
+                format!(
+                    "{:.10}",
+                    v.iter().map(|x| PrettyPrintFloat(*x)).format(", ")
+                )
             ),
         }
     }
