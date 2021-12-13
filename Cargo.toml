@@ -12,8 +12,9 @@ license = "MIT"
 azure-devops = { project = "eronshagen/shages", pipeline = "shages.liberty-parse" }
 
 [dependencies]
-nom = "5.0.0"
-itertools = "0.8.0"
+nom = "5.0"
+itertools = "0.8"
+float-pretty-print = "0.1.1"
 
 [dev-dependencies]
 criterion = "0.2"
