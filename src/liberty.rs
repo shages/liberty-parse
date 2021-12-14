@@ -6,7 +6,11 @@
 //! * `cell` and `pin` groups are brought out into [HashMap](std::collections::HashMap)s so they're
 //!   easier to work with
 
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    ops::{Deref, DerefMut},
+};
 
 use crate::ast::{GroupItem, LibertyAst, Value};
 
@@ -30,6 +34,20 @@ impl Liberty {
                 .map(|g| Library::from_group(Group::from_group_item(g)))
                 .collect(),
         )
+    }
+}
+
+impl Deref for Liberty {
+    type Target = [Library];
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl DerefMut for Liberty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.deref_mut()
     }
 }
 

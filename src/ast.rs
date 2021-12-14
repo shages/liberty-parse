@@ -75,7 +75,7 @@ fn items_to_string(items: &[GroupItem], level: usize) -> String {
             ),
             GroupItem::Comment(v) => format!("/*\n{}\n*/", v),
             GroupItem::Group(type_, name, group_items) => format!(
-                "{}{} ( {} ) {{\n{}\n{}}}",
+                "{}{} ({}) {{\n{}\n{}}}",
                 indent,
                 type_,
                 name,
