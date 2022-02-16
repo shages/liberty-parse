@@ -2,12 +2,12 @@
 //!
 //! Specifically:
 //! * attributes are separated into `simple_attributes` and `complex_attributes`
-//!   struct fields as [HashMap](std::collections::HashMap)s.
-//! * `cell` and `pin` groups are brought out into [HashMap](std::collections::HashMap)s so they're
+//!   struct fields as [BTreeMap](std::collections::BTreeMap)s.
+//! * `cell` and `pin` groups are brought out into [BTreeMap](std::collections::BTreeMap)s so they're
 //!   easier to work with
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt,
     ops::{Deref, DerefMut},
 };
@@ -79,20 +79,20 @@ impl IntoIterator for Liberty {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Library {
     pub name: String,
-    pub simple_attributes: HashMap<String, Value>,
-    pub complex_attributes: HashMap<String, Vec<Value>>,
+    pub simple_attributes: BTreeMap<String, Value>,
+    pub complex_attributes: BTreeMap<String, Vec<Value>>,
     pub groups: Vec<Group>,
-    pub cells: HashMap<String, Cell>,
+    pub cells: BTreeMap<String, Cell>,
 }
 
 impl Library {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: HashMap::new(),
-            complex_attributes: HashMap::new(),
+            simple_attributes: BTreeMap::new(),
+            complex_attributes: BTreeMap::new(),
             groups: vec![],
-            cells: HashMap::new(),
+            cells: BTreeMap::new(),
         }
     }
 }
@@ -104,8 +104,8 @@ impl Library {
 pub struct Group {
     pub type_: String,
     pub name: String,
-    pub simple_attributes: HashMap<String, Value>,
-    pub complex_attributes: HashMap<String, Vec<Value>>,
+    pub simple_attributes: BTreeMap<String, Value>,
+    pub complex_attributes: BTreeMap<String, Vec<Value>>,
     pub groups: Vec<Group>,
 }
 
@@ -115,8 +115,8 @@ impl Group {
         Self {
             type_: type_.to_string(),
             name: name.to_string(),
-            simple_attributes: HashMap::new(),
-            complex_attributes: HashMap::new(),
+            simple_attributes: BTreeMap::new(),
+            complex_attributes: BTreeMap::new(),
             groups: vec![],
         }
     }
@@ -124,8 +124,8 @@ impl Group {
     /// Convert an AST [GroupItem::Group] variant into a [Group] struct
     pub fn from_group_item(group_item: GroupItem) -> Self {
         let (type_, name, items) = group_item.group();
-        let mut simple_attributes: HashMap<String, Value> = HashMap::new();
-        let mut complex_attributes: HashMap<String, Vec<Value>> = HashMap::new();
+        let mut simple_attributes: BTreeMap<String, Value> = BTreeMap::new();
+        let mut complex_attributes: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         let mut groups: Vec<Self> = vec![];
         for item in items {
             match item {
@@ -174,10 +174,10 @@ impl Group {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Cell {
     pub name: String,
-    pub simple_attributes: HashMap<String, Value>,
-    pub complex_attributes: HashMap<String, Vec<Value>>,
+    pub simple_attributes: BTreeMap<String, Value>,
+    pub complex_attributes: BTreeMap<String, Vec<Value>>,
     pub groups: Vec<Group>,
-    pub pins: HashMap<String, Pin>,
+    pub pins: BTreeMap<String, Pin>,
 }
 
 impl Cell {
@@ -185,10 +185,10 @@ impl Cell {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: HashMap::new(),
-            complex_attributes: HashMap::new(),
+            simple_attributes: BTreeMap::new(),
+            complex_attributes: BTreeMap::new(),
             groups: vec![],
-            pins: HashMap::new(),
+            pins: BTreeMap::new(),
         }
     }
 }
@@ -197,8 +197,8 @@ impl Cell {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pin {
     pub name: String,
-    pub simple_attributes: HashMap<String, Value>,
-    pub complex_attributes: HashMap<String, Vec<Value>>,
+    pub simple_attributes: BTreeMap<String, Value>,
+    pub complex_attributes: BTreeMap<String, Vec<Value>>,
     pub groups: Vec<Group>,
 }
 
@@ -207,8 +207,8 @@ impl Pin {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: HashMap::new(),
-            complex_attributes: HashMap::new(),
+            simple_attributes: BTreeMap::new(),
+            complex_attributes: BTreeMap::new(),
             groups: vec![],
         }
     }
@@ -238,7 +238,7 @@ impl FromGroup for Library {
             simple_attributes: group.simple_attributes,
             complex_attributes: group.complex_attributes,
             groups,
-            cells: cells.into_iter().fold(HashMap::new(), |mut acc, cell| {
+            cells: cells.into_iter().fold(BTreeMap::new(), |mut acc, cell| {
                 acc.insert(cell.name.clone(), Cell::from_group(cell));
                 acc
             }),
@@ -271,7 +271,7 @@ impl FromGroup for Cell {
             simple_attributes: group.simple_attributes,
             complex_attributes: group.complex_attributes,
             groups,
-            pins: pins.into_iter().fold(HashMap::new(), |mut acc, pin| {
+            pins: pins.into_iter().fold(BTreeMap::new(), |mut acc, pin| {
                 acc.insert(pin.name.clone(), Pin::from_group(pin));
                 acc
             }),
