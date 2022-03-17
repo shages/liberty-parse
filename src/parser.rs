@@ -196,7 +196,7 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                                 preceded(
                                     multispace0,
                                     alt((
-                                        map(quoted_string, |s| format!(r#"{}"#, s)),
+                                        map(quoted_string, |s| format!("\"{}\"", s)),
                                         map(underscore_tag, |s| format!("{}", s)),
                                     )),
                                 ),
