@@ -193,9 +193,15 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                         map(
                             separated_list(
                                 preceded(multispace0, char(',')),
-                                preceded(multispace0, alt((quoted_string, underscore_tag))),
+                                preceded(
+                                    multispace0,
+                                    alt((
+                                        map(quoted_string, |s| format!(r#"{}"#, s)),
+                                        map(underscore_tag, |s| format!("{}", s)),
+                                    )),
+                                ),
                             ),
-                            |vals: Vec<&str>| vals.join(","),
+                            |vals: Vec<String>| vals.join(", "),
                         ),
                         preceded(multispace0, char(')')),
                     ),
