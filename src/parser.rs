@@ -1,5 +1,8 @@
 use crate::ast::{GroupItem, Value};
 
+use gpoint::GPoint;
+
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, tag, take_until, take_while},
@@ -198,6 +201,15 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                                     alt((
                                         map(quoted_string, |s| format!("\"{}\"", s)),
                                         map(underscore_tag, |s| format!("{}", s)),
+                                        map(double, |s| format!("{}", GPoint(s))),
+                                        map(quoted_floats, |s| {
+                                            format!(
+                                                "\"{}\"",
+                                                s.into_iter()
+                                                    .map(|f| format!("{}", GPoint(f)))
+                                                    .format(",")
+                                            )
+                                        }),
                                     )),
                                 ),
                             ),

@@ -8,7 +8,7 @@ use crate::error::Error;
 use crate::liberty::Liberty;
 use crate::parser::parse_libs;
 
-use float_pretty_print::PrettyPrintFloat;
+use gpoint::GPoint;
 use itertools::Itertools;
 use nom::error::VerboseError;
 
@@ -157,11 +157,11 @@ impl fmt::Display for Value {
                     write!(f, "false")
                 }
             }
-            Value::Float(v) => write!(f, "{}", PrettyPrintFloat(*v)),
+            Value::Float(v) => write!(f, "{}", GPoint(*v)),
             Value::FloatGroup(v) => write!(
                 f,
                 "\"{}\"",
-                format!("{}", v.iter().map(|x| PrettyPrintFloat(*x)).format(", "))
+                format!("{}", v.iter().map(|x| GPoint(*x)).format(", "))
             ),
         }
     }
