@@ -20,7 +20,7 @@
 //!     let area = lib
 //!         .cells
 //!         .get("AND2")
-//!         .and_then(|c| c.simple_attributes.get("area"))
+//!         .and_then(|c| c.simple_attribute("area"))
 //!         .map_or(-1.0, |v| v.float());
 //!     println!("Cell AND2 has area: {}", area);
 //! }

@@ -6,7 +6,7 @@ fn parse<'a>(contents: &'a str) -> result::Result<(), Error<'a>> {
         println!("Parsed library '{}'", lib.name);
         for (name, cell) in lib.cells {
             println!("Cell: {}", name);
-            if let Some(area) = cell.simple_attributes.get("area") {
+            if let Some(area) = cell.simple_attribute("area") {
                 println!("Cell has area: {:?}", area.float());
             }
         }

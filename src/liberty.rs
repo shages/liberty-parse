@@ -2,15 +2,16 @@
 //!
 //! Specifically:
 //! * attributes are separated into `simple_attributes` and `complex_attributes`
-//!   struct fields as [BTreeMap](std::collections::BTreeMap)s.
-//! * `cell` and `pin` groups are brought out into [BTreeMap](std::collections::BTreeMap)s so they're
+//!   struct fields as [IndexMap](std::collections::IndexMap)s.
+//! * `cell` and `pin` groups are brought out into [IndexMap](std::collections::IndexMap)s so they're
 //!   easier to work with
 
 use std::{
-    collections::BTreeMap,
     fmt,
     ops::{Deref, DerefMut},
 };
+
+use indexmap::IndexMap;
 
 use crate::ast::{GroupItem, LibertyAst, Value};
 
@@ -79,22 +80,40 @@ impl IntoIterator for Liberty {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Library {
     pub name: String,
-    pub simple_attributes: BTreeMap<String, Value>,
-    pub complex_attributes: BTreeMap<String, Vec<Value>>,
+    pub attributes: IndexMap<String, Attribute>,
     pub groups: Vec<Group>,
-    pub cells: BTreeMap<String, Cell>,
+    pub cells: IndexMap<String, Cell>,
 }
 
 impl Library {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: BTreeMap::new(),
-            complex_attributes: BTreeMap::new(),
+            attributes: IndexMap::new(),
             groups: vec![],
-            cells: BTreeMap::new(),
+            cells: IndexMap::new(),
         }
     }
+
+    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Complex(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Simple(value) => Some(value),
+            _ => None,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Attribute {
+    Simple(Value),
+    Complex(Vec<Value>),
 }
 
 /// General group struct
@@ -104,8 +123,7 @@ impl Library {
 pub struct Group {
     pub type_: String,
     pub name: String,
-    pub simple_attributes: BTreeMap<String, Value>,
-    pub complex_attributes: BTreeMap<String, Vec<Value>>,
+    pub attributes: IndexMap<String, Attribute>,
     pub groups: Vec<Group>,
 }
 
@@ -115,8 +133,7 @@ impl Group {
         Self {
             type_: type_.to_string(),
             name: name.to_string(),
-            simple_attributes: BTreeMap::new(),
-            complex_attributes: BTreeMap::new(),
+            attributes: IndexMap::new(),
             groups: vec![],
         }
     }
@@ -124,16 +141,15 @@ impl Group {
     /// Convert an AST [GroupItem::Group] variant into a [Group] struct
     pub fn from_group_item(group_item: GroupItem) -> Self {
         let (type_, name, items) = group_item.group();
-        let mut simple_attributes: BTreeMap<String, Value> = BTreeMap::new();
-        let mut complex_attributes: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        let mut attributes: IndexMap<String, Attribute> = IndexMap::new();
         let mut groups: Vec<Self> = vec![];
         for item in items {
             match item {
                 GroupItem::SimpleAttr(name, value) => {
-                    simple_attributes.insert(name, value);
+                    attributes.insert(name, Attribute::Simple(value));
                 }
                 GroupItem::ComplexAttr(name, value) => {
-                    complex_attributes.insert(name, value);
+                    attributes.insert(name, Attribute::Complex(value));
                 }
                 GroupItem::Group(type_, name, items) => {
                     groups.push(Group::from_group_item(GroupItem::Group(type_, name, items)));
@@ -144,29 +160,35 @@ impl Group {
         Self {
             name,
             type_,
-            simple_attributes,
-            complex_attributes,
+            attributes,
             groups,
         }
     }
 
     /// Convert a [Liberty] struct into a [GroupItem::Group] variant
     pub fn into_group_item(self) -> GroupItem {
-        let mut items: Vec<GroupItem> = Vec::with_capacity(
-            self.simple_attributes.len() + self.complex_attributes.len() + self.groups.len(),
-        );
-        items.extend(
-            self.simple_attributes
-                .into_iter()
-                .map(|(name, value)| GroupItem::SimpleAttr(name, value)),
-        );
-        items.extend(
-            self.complex_attributes
-                .into_iter()
-                .map(|(name, value)| GroupItem::ComplexAttr(name, value)),
-        );
+        let mut items: Vec<GroupItem> =
+            Vec::with_capacity(self.attributes.len() + self.groups.len());
+        items.extend(self.attributes.into_iter().map(|(name, attr)| match attr {
+            Attribute::Simple(value) => GroupItem::SimpleAttr(name, value),
+            Attribute::Complex(value) => GroupItem::ComplexAttr(name, value),
+        }));
         items.extend(self.groups.into_iter().map(|g| g.into_group_item()));
         GroupItem::Group(self.type_, self.name, items)
+    }
+
+    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Complex(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Simple(value) => Some(value),
+            _ => None,
+        })
     }
 }
 
@@ -174,10 +196,9 @@ impl Group {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Cell {
     pub name: String,
-    pub simple_attributes: BTreeMap<String, Value>,
-    pub complex_attributes: BTreeMap<String, Vec<Value>>,
+    pub attributes: IndexMap<String, Attribute>,
     pub groups: Vec<Group>,
-    pub pins: BTreeMap<String, Pin>,
+    pub pins: IndexMap<String, Pin>,
 }
 
 impl Cell {
@@ -185,11 +206,24 @@ impl Cell {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: BTreeMap::new(),
-            complex_attributes: BTreeMap::new(),
+            attributes: IndexMap::new(),
             groups: vec![],
-            pins: BTreeMap::new(),
+            pins: IndexMap::new(),
         }
+    }
+
+    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Complex(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Simple(value) => Some(value),
+            _ => None,
+        })
     }
 }
 
@@ -197,8 +231,7 @@ impl Cell {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pin {
     pub name: String,
-    pub simple_attributes: BTreeMap<String, Value>,
-    pub complex_attributes: BTreeMap<String, Vec<Value>>,
+    pub attributes: IndexMap<String, Attribute>,
     pub groups: Vec<Group>,
 }
 
@@ -207,10 +240,23 @@ impl Pin {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            simple_attributes: BTreeMap::new(),
-            complex_attributes: BTreeMap::new(),
+            attributes: IndexMap::new(),
             groups: vec![],
         }
+    }
+
+    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Complex(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
+        self.attributes.get(name).and_then(|attr| match attr {
+            Attribute::Simple(value) => Some(value),
+            _ => None,
+        })
     }
 }
 
@@ -235,10 +281,9 @@ impl FromGroup for Library {
         let (cells, groups) = group.groups.into_iter().partition(|g| g.type_ == "cell");
         Self {
             name: group.name,
-            simple_attributes: group.simple_attributes,
-            complex_attributes: group.complex_attributes,
+            attributes: group.attributes,
             groups,
-            cells: cells.into_iter().fold(BTreeMap::new(), |mut acc, cell| {
+            cells: cells.into_iter().fold(IndexMap::new(), |mut acc, cell| {
                 acc.insert(cell.name.clone(), Cell::from_group(cell));
                 acc
             }),
@@ -255,8 +300,7 @@ impl ToGroup for Library {
         Group {
             name: self.name,
             type_: String::from("library"),
-            simple_attributes: self.simple_attributes,
-            complex_attributes: self.complex_attributes,
+            attributes: self.attributes,
             groups,
         }
     }
@@ -268,10 +312,9 @@ impl FromGroup for Cell {
         let (pins, groups) = group.groups.into_iter().partition(|g| g.type_ == "pin");
         Self {
             name: group.name,
-            simple_attributes: group.simple_attributes,
-            complex_attributes: group.complex_attributes,
+            attributes: group.attributes,
             groups,
-            pins: pins.into_iter().fold(BTreeMap::new(), |mut acc, pin| {
+            pins: pins.into_iter().fold(IndexMap::new(), |mut acc, pin| {
                 acc.insert(pin.name.clone(), Pin::from_group(pin));
                 acc
             }),
@@ -289,8 +332,7 @@ impl ToGroup for Cell {
         Group {
             name: self.name,
             type_: String::from("cell"),
-            simple_attributes: self.simple_attributes,
-            complex_attributes: self.complex_attributes,
+            attributes: self.attributes,
             groups,
         }
     }
@@ -301,8 +343,7 @@ impl FromGroup for Pin {
     fn from_group(group: Group) -> Self::Item {
         Self {
             name: group.name,
-            simple_attributes: group.simple_attributes,
-            complex_attributes: group.complex_attributes,
+            attributes: group.attributes,
             groups: group.groups,
         }
     }
@@ -314,8 +355,7 @@ impl ToGroup for Pin {
         Group {
             name: self.name,
             type_: String::from("pin"),
-            simple_attributes: self.simple_attributes,
-            complex_attributes: self.complex_attributes,
+            attributes: self.attributes,
             groups: self.groups,
         }
     }
