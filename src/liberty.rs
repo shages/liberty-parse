@@ -17,29 +17,24 @@ use crate::ast::{GroupItem, LibertyAst, Value};
 
 /// Top-level data structure of a Liberty file
 #[derive(Debug, PartialEq, Clone)]
-pub struct Liberty(pub Vec<Library>);
+pub struct Liberty(pub Vec<Group>);
 
 impl Liberty {
     pub fn to_ast(self) -> LibertyAst {
-        LibertyAst(
-            self.0
-                .into_iter()
-                .map(|g| g.into_group().into_group_item())
-                .collect(),
-        )
+        LibertyAst(self.0.into_iter().map(|g| g.into_group_item()).collect())
     }
     pub fn from_ast(ast: LibertyAst) -> Self {
         Liberty(
             ast.0
                 .into_iter()
-                .map(|g| Library::from_group(Group::from_group_item(g)))
+                .map(|g| Group::from_group_item(g))
                 .collect(),
         )
     }
 }
 
 impl Deref for Liberty {
-    type Target = [Library];
+    type Target = [Group];
 
     fn deref(&self) -> &Self::Target {
         self.0.deref()
@@ -65,7 +60,7 @@ impl fmt::Display for Liberty {
 }
 
 impl IntoIterator for Liberty {
-    type Item = Library;
+    type Item = Group;
     type IntoIter = ::std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -73,43 +68,9 @@ impl IntoIterator for Liberty {
     }
 }
 
-/// Top-level `library` group
+/// General attribute struct
 ///
-/// Every liberty file defines a `library` at the top-most level. Libraries contain
-/// attributes, groups, and [Cell](Cell)s.
-#[derive(Debug, PartialEq, Clone)]
-pub struct Library {
-    pub name: String,
-    pub attributes: IndexMap<String, Attribute>,
-    pub groups: Vec<Group>,
-    pub cells: IndexMap<String, Cell>,
-}
-
-impl Library {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            attributes: IndexMap::new(),
-            groups: vec![],
-            cells: IndexMap::new(),
-        }
-    }
-
-    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Complex(value) => Some(value),
-            _ => None,
-        })
-    }
-
-    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Simple(value) => Some(value),
-            _ => None,
-        })
-    }
-}
-
+/// Attributes can be simple or complex
 #[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     Simple(Value),
@@ -124,7 +85,7 @@ pub struct Group {
     pub type_: String,
     pub name: String,
     pub attributes: IndexMap<String, Attribute>,
-    pub groups: Vec<Group>,
+    pub subgroups: Vec<Group>,
 }
 
 impl Group {
@@ -134,7 +95,7 @@ impl Group {
             type_: type_.to_string(),
             name: name.to_string(),
             attributes: IndexMap::new(),
-            groups: vec![],
+            subgroups: vec![],
         }
     }
 
@@ -142,7 +103,7 @@ impl Group {
     pub fn from_group_item(group_item: GroupItem) -> Self {
         let (type_, name, items) = group_item.group();
         let mut attributes: IndexMap<String, Attribute> = IndexMap::new();
-        let mut groups: Vec<Self> = vec![];
+        let mut subgroups = vec![];
         for item in items {
             match item {
                 GroupItem::SimpleAttr(name, value) => {
@@ -152,7 +113,8 @@ impl Group {
                     attributes.insert(name, Attribute::Complex(value));
                 }
                 GroupItem::Group(type_, name, items) => {
-                    groups.push(Group::from_group_item(GroupItem::Group(type_, name, items)));
+                    subgroups
+                        .push(Group::from_group_item(GroupItem::Group(type_, name, items)).into());
                 }
                 _ => {}
             }
@@ -161,22 +123,23 @@ impl Group {
             name,
             type_,
             attributes,
-            groups,
+            subgroups,
         }
     }
 
-    /// Convert a [Liberty] struct into a [GroupItem::Group] variant
+    /// Convert a [Group] struct into a [GroupItem::Group] variant
     pub fn into_group_item(self) -> GroupItem {
         let mut items: Vec<GroupItem> =
-            Vec::with_capacity(self.attributes.len() + self.groups.len());
+            Vec::with_capacity(self.attributes.len() + self.subgroups.len());
         items.extend(self.attributes.into_iter().map(|(name, attr)| match attr {
             Attribute::Simple(value) => GroupItem::SimpleAttr(name, value),
             Attribute::Complex(value) => GroupItem::ComplexAttr(name, value),
         }));
-        items.extend(self.groups.into_iter().map(|g| g.into_group_item()));
+        items.extend(self.subgroups.into_iter().map(|g| g.into_group_item()));
         GroupItem::Group(self.type_, self.name, items)
     }
 
+    /// Get a complex attribute by name
     pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
         self.attributes.get(name).and_then(|attr| match attr {
             Attribute::Complex(value) => Some(value),
@@ -184,265 +147,118 @@ impl Group {
         })
     }
 
+    /// Get a simple attribute by name
     pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
         self.attributes.get(name).and_then(|attr| match attr {
             Attribute::Simple(value) => Some(value),
             _ => None,
         })
     }
-}
 
-/// `cell` group of a [Library](Library)
-#[derive(Debug, PartialEq, Clone)]
-pub struct Cell {
-    pub name: String,
-    pub attributes: IndexMap<String, Attribute>,
-    pub groups: Vec<Group>,
-    pub pins: IndexMap<String, Pin>,
-}
-
-impl Cell {
-    /// Create a cell with empty attributes and sub-groups
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            attributes: IndexMap::new(),
-            groups: vec![],
-            pins: IndexMap::new(),
-        }
+    /// Iterate over the complex attributes
+    pub fn iter_complex_attributes(&self) -> impl Iterator<Item = (&String, &Vec<Value>)> {
+        self.attributes
+            .iter()
+            .filter_map(|(name, attr)| match attr {
+                Attribute::Complex(value) => Some((name, value)),
+                _ => None,
+            })
     }
 
-    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Complex(value) => Some(value),
-            _ => None,
-        })
+    /// Iterate over the complex attributes mutably
+    pub fn iter_complex_attributes_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (&String, &mut Vec<Value>)> {
+        self.attributes
+            .iter_mut()
+            .filter_map(|(name, attr)| match attr {
+                Attribute::Complex(value) => Some((name, value)),
+                _ => None,
+            })
     }
 
-    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Simple(value) => Some(value),
-            _ => None,
-        })
-    }
-}
-
-/// `pin` group of a [Cell](Cell)
-#[derive(Debug, PartialEq, Clone)]
-pub struct Pin {
-    pub name: String,
-    pub attributes: IndexMap<String, Attribute>,
-    pub groups: Vec<Group>,
-}
-
-impl Pin {
-    /// Create a pin with empty attributes and sub-groups
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            attributes: IndexMap::new(),
-            groups: vec![],
-        }
+    /// Iterate over the simple attributes
+    pub fn iter_simple_attributes(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.attributes
+            .iter()
+            .filter_map(|(name, attr)| match attr {
+                Attribute::Simple(value) => Some((name, value)),
+                _ => None,
+            })
     }
 
-    pub fn complex_attribute(&self, name: &str) -> Option<&Vec<Value>> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Complex(value) => Some(value),
-            _ => None,
-        })
+    /// Iterate over the simple attributes mutably
+    pub fn iter_simple_attributes_mut(&mut self) -> impl Iterator<Item = (&String, &mut Value)> {
+        self.attributes
+            .iter_mut()
+            .filter_map(|(name, attr)| match attr {
+                Attribute::Simple(value) => Some((name, value)),
+                _ => None,
+            })
     }
 
-    pub fn simple_attribute(&self, name: &str) -> Option<&Value> {
-        self.attributes.get(name).and_then(|attr| match attr {
-            Attribute::Simple(value) => Some(value),
-            _ => None,
-        })
-    }
-}
-
-/// Convert a general Group into a more specific type
-///
-/// Implemented by Pin, Cell, or Library
-pub trait FromGroup {
-    type Item;
-
-    fn from_group(group: Group) -> Self::Item;
-}
-
-pub trait ToGroup {
-    type Item;
-
-    fn into_group(self) -> Group;
-}
-
-impl FromGroup for Library {
-    type Item = Library;
-    fn from_group(group: Group) -> Self::Item {
-        let (cells, groups) = group.groups.into_iter().partition(|g| g.type_ == "cell");
-        Self {
-            name: group.name,
-            attributes: group.attributes,
-            groups,
-            cells: cells.into_iter().fold(IndexMap::new(), |mut acc, cell| {
-                acc.insert(cell.name.clone(), Cell::from_group(cell));
-                acc
-            }),
-        }
-    }
-}
-
-impl ToGroup for Library {
-    type Item = Library;
-    fn into_group(self) -> Group {
-        let mut groups: Vec<Group> = Vec::with_capacity(self.groups.len() + self.cells.len());
-        groups.extend(self.groups);
-        groups.extend(self.cells.into_iter().map(|(_, cell)| cell.into_group()));
-        Group {
-            name: self.name,
-            type_: String::from("library"),
-            attributes: self.attributes,
-            groups,
-        }
-    }
-}
-
-impl FromGroup for Cell {
-    type Item = Cell;
-    fn from_group(group: Group) -> Self::Item {
-        let (pins, groups) = group.groups.into_iter().partition(|g| g.type_ == "pin");
-        Self {
-            name: group.name,
-            attributes: group.attributes,
-            groups,
-            pins: pins.into_iter().fold(IndexMap::new(), |mut acc, pin| {
-                acc.insert(pin.name.clone(), Pin::from_group(pin));
-                acc
-            }),
-        }
-    }
-}
-
-impl ToGroup for Cell {
-    type Item = Cell;
-
-    fn into_group(self) -> Group {
-        let mut groups: Vec<Group> = Vec::with_capacity(self.groups.len() + self.pins.len());
-        groups.extend(self.pins.into_iter().map(|(_, pin)| pin.into_group()));
-        groups.extend(self.groups);
-        Group {
-            name: self.name,
-            type_: String::from("cell"),
-            attributes: self.attributes,
-            groups,
-        }
-    }
-}
-
-impl FromGroup for Pin {
-    type Item = Pin;
-    fn from_group(group: Group) -> Self::Item {
-        Self {
-            name: group.name,
-            attributes: group.attributes,
-            groups: group.groups,
-        }
-    }
-}
-
-impl ToGroup for Pin {
-    type Item = Pin;
-    fn into_group(self) -> Group {
-        Group {
-            name: self.name,
-            type_: String::from("pin"),
-            attributes: self.attributes,
-            groups: self.groups,
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_iter() {
-        let lib = Liberty(vec![Library::new("mylib")]);
-        let mut iter = lib.into_iter();
-        assert_eq!(iter.next(), Some(Library::new("mylib")));
-        assert_eq!(iter.next(), None);
+    /// Iterate over the subgroups of a given type
+    pub fn iter_subgroups_of_type<'a>(&'a self, type_: &'a str) -> impl Iterator<Item = &'a Group> {
+        self.subgroups.iter().filter(move |g| g.type_ == type_)
     }
 
-    #[test]
-    fn test_pin_into_group() {
-        let mut pin = Pin::new("my_pin");
-        pin.groups.push(Group::new("gtype", "gname"));
-        let group = pin.into_group();
-        assert_eq!(group.type_, "pin");
-        assert_eq!(group.name, "my_pin");
-        assert_eq!(group.groups.len(), 1);
+    /// Iterate over the subgroups of a given type mutably
+    pub fn iter_subgroups_of_type_mut<'a>(
+        &'a mut self,
+        type_: &'a str,
+    ) -> impl Iterator<Item = &'a mut Group> {
+        self.subgroups.iter_mut().filter(move |g| g.type_ == type_)
     }
 
-    #[test]
-    fn test_pin_from_group() {
-        let mut group = Group::new("pin", "a");
-        group.groups.push(Group::new("gtype", "gname"));
-        let pin = Pin::from_group(group);
-        assert_eq!(pin.name, "a");
-        assert_eq!(pin.groups.len(), 1);
+    /// Iterate over the subgroups
+    pub fn iter_subgroups(&self) -> impl Iterator<Item = &Group> {
+        self.subgroups.iter()
     }
 
-    #[test]
-    fn test_cell_into_group() {
-        let mut cell = Cell::new("my_cell");
-        cell.groups.push(Group::new("gtype", "gname"));
-        cell.pins.insert("a".to_string(), Pin::new("a"));
-        cell.pins.insert("b".to_string(), Pin::new("b"));
-        let group = cell.into_group();
-        assert_eq!(group.type_, "cell");
-        assert_eq!(group.name, "my_cell");
-        assert_eq!(group.groups.len(), 3);
+    /// Iterate over the subgroups mutably
+    pub fn iter_subgroups_mut(&mut self) -> impl Iterator<Item = &mut Group> {
+        self.subgroups.iter_mut()
     }
 
-    #[test]
-    fn test_cell_from_group() {
-        let mut group = Group::new("cell", "AND2");
-        group.groups.push(Group::new("gtype", "gname"));
-        group.groups.push(Group::new("pin", "a"));
-        group.groups.push(Group::new("pin", "b"));
-        let cell = Cell::from_group(group);
-        assert_eq!(cell.name, "AND2");
-        assert_eq!(cell.groups.len(), 1);
-        assert_eq!(cell.pins.len(), 2);
+    /// Get cell by name
+    pub fn get_cell(&self, name: &str) -> Option<&Group> {
+        self.iter_subgroups_of_type("cell").find(|g| g.name == name)
     }
 
-    #[test]
-    fn test_library_into_group() {
-        let mut lib = Library::new("my_lib");
-        lib.groups.push(Group::new("gtype", "gname"));
-        lib.cells.insert("AND2".to_string(), Cell::new("AND2"));
-        lib.cells.insert("NAND2".to_string(), Cell::new("NAND2"));
-        let group = lib.into_group();
-        assert_eq!(group.type_, "library");
-        assert_eq!(group.name, "my_lib");
-        assert_eq!(group.groups.len(), 3);
+    /// Get cell by name mutably
+    pub fn get_cell_mut(&mut self, name: &str) -> Option<&mut Group> {
+        self.iter_subgroups_of_type_mut("cell")
+            .find(|g| g.name == name)
     }
 
-    #[test]
-    fn test_lib_from_group() {
-        let mut group = Group::new("library", "mylib");
-        group.groups.push(Group::new("gtype", "gname"));
-        let mut cell = Group::new("cell", "AND2");
-        cell.groups.push(Group::new("pin", "a"));
-        cell.groups.push(Group::new("pin", "b"));
-        group.groups.push(cell);
-        let lib = Library::from_group(group);
-        assert_eq!(lib.name, "mylib");
-        assert_eq!(lib.groups.len(), 1);
-        assert_eq!(lib.cells.len(), 1);
-        let converted_cell = lib.cells.get("AND2").unwrap();
-        assert_eq!(converted_cell.name, "AND2");
-        assert_eq!(converted_cell.groups.len(), 0);
-        assert_eq!(converted_cell.pins.len(), 2);
+    /// Get pin by name
+    pub fn get_pin(&self, name: &str) -> Option<&Group> {
+        self.iter_subgroups_of_type("pin").find(|g| g.name == name)
+    }
+
+    /// Get pin by name mutably
+    pub fn get_pin_mut(&mut self, name: &str) -> Option<&mut Group> {
+        self.iter_subgroups_of_type_mut("pin")
+            .find(|g| g.name == name)
+    }
+
+    /// Iterate over the cells
+    pub fn iter_cells(&self) -> impl Iterator<Item = &Group> {
+        self.iter_subgroups_of_type("cell")
+    }
+
+    /// Iterate over the cells mutably
+    pub fn iter_cells_mut(&mut self) -> impl Iterator<Item = &mut Group> {
+        self.iter_subgroups_of_type_mut("cell")
+    }
+
+    /// Iterate over the pins
+    pub fn iter_pins(&self) -> impl Iterator<Item = &Group> {
+        self.iter_subgroups_of_type("pin")
+    }
+
+    /// Iterate over the pins mutably
+    pub fn iter_pins_mut(&mut self) -> impl Iterator<Item = &mut Group> {
+        self.iter_subgroups_of_type_mut("pin")
     }
 }
