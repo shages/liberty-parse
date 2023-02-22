@@ -1,5 +1,8 @@
 use crate::ast::{GroupItem, Value};
 
+use gpoint::GPoint;
+
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, tag, take_until, take_while},
@@ -193,9 +196,24 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                         map(
                             separated_list(
                                 preceded(multispace0, char(',')),
-                                preceded(multispace0, alt((quoted_string, underscore_tag))),
+                                preceded(
+                                    multispace0,
+                                    alt((
+                                        map(quoted_string, |s| format!("\"{}\"", s)),
+                                        map(underscore_tag, |s| format!("{}", s)),
+                                        map(double, |s| format!("{}", GPoint(s))),
+                                        map(quoted_floats, |s| {
+                                            format!(
+                                                "\"{}\"",
+                                                s.into_iter()
+                                                    .map(|f| format!("{}", GPoint(f)))
+                                                    .format(",")
+                                            )
+                                        }),
+                                    )),
+                                ),
                             ),
-                            |vals: Vec<&str>| vals.join(","),
+                            |vals: Vec<String>| vals.join(", "),
                         ),
                         preceded(multispace0, char(')')),
                     ),
@@ -208,7 +226,7 @@ fn parse_group<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, Grou
                     )),
                 ),
             )),
-            |(gtype, name, body)| GroupItem::Group(gtype.to_string(), name.to_string(), body),
+            |(gtype, name, body)| GroupItem::Group(gtype.to_string(), name, body),
         ),
     )(input)
 }
@@ -643,5 +661,4 @@ library(foo) {
             ))
         );
     }
-
 }

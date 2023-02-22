@@ -4,9 +4,9 @@ use std::{env, fs, result};
 fn parse<'a>(contents: &'a str) -> result::Result<(), Error<'a>> {
     for lib in parse_lib(contents)? {
         println!("Parsed library '{}'", lib.name);
-        for (name, cell) in lib.cells {
-            println!("Cell: {}", name);
-            if let Some(area) = cell.simple_attributes.get("area") {
+        for cell in lib.iter_cells() {
+            println!("Cell: {}", cell.name);
+            if let Some(area) = cell.simple_attribute("area") {
                 println!("Cell has area: {:?}", area.float());
             }
         }

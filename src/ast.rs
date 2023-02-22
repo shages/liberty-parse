@@ -2,12 +2,13 @@
 //! file.
 //!
 
-use std::result;
+use std::{fmt, result};
 
 use crate::error::Error;
 use crate::liberty::Liberty;
 use crate::parser::parse_libs;
 
+use gpoint::GPoint;
 use itertools::Itertools;
 use nom::error::VerboseError;
 
@@ -34,11 +35,6 @@ impl LibertyAst {
             .map(|(_, libs)| LibertyAst::new(libs))
     }
 
-    /// Get a `String` representation from an AST
-    pub fn to_string(&self) -> String {
-        items_to_string(&self.0)
-    }
-
     /// Convert an AST into a [`Liberty`] struct
     pub fn into_liberty(self) -> Liberty {
         Liberty::from_ast(self)
@@ -50,23 +46,41 @@ impl LibertyAst {
     }
 }
 
+impl fmt::Display for LibertyAst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", items_to_string(&self.0, 0))
+    }
+}
+
+impl From<Liberty> for LibertyAst {
+    fn from(liberty: Liberty) -> Self {
+        LibertyAst::from_liberty(liberty)
+    }
+}
+
 // Recursively convert a vector of [`GroupItem`]s into a single `String`
-fn items_to_string(items: &Vec<GroupItem>) -> String {
+fn items_to_string(items: &[GroupItem], level: usize) -> String {
+    let indent = "  ".repeat(level);
     items
         .iter()
         .map(|item| match item {
-            GroupItem::SimpleAttr(name, value) => format!("{} : {};\n", name, value.to_string()),
+            GroupItem::SimpleAttr(name, value) => {
+                format!("{}{} : {};", indent, name, value.to_string())
+            }
             GroupItem::ComplexAttr(name, values) => format!(
-                "{} (\n{}\n)\n",
+                "{}{} ({});",
+                indent,
                 name,
                 values.iter().map(|v| v.to_string()).join(", ")
             ),
             GroupItem::Comment(v) => format!("/*\n{}\n*/", v),
             GroupItem::Group(type_, name, group_items) => format!(
-                "{} ( {} ) {{\n{}\n}}",
+                "{}{} ({}) {{\n{}\n{}}}",
+                indent,
                 type_,
                 name,
-                items_to_string(group_items)
+                items_to_string(group_items, level + 1),
+                indent
             ),
         })
         .join("\n")
@@ -131,28 +145,33 @@ pub enum Value {
     Expression(String),
 }
 
-impl Value {
-    /// Get a `String` representation of a [`Value`]
-    pub fn to_string(&self) -> String {
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::String(v) => format!("\"{}\"", v),
-            Value::Expression(v) => format!("{}", v),
+            Value::Expression(v) => v.fmt(f),
+            Value::String(v) => write!(f, "\"{}\"", v),
             Value::Bool(v) => {
                 if *v {
-                    "true".to_string()
+                    write!(f, "true")
                 } else {
-                    "false".to_string()
+                    write!(f, "false")
                 }
             }
-            Value::Float(v) => format!("{:.6}", v),
-            Value::FloatGroup(v) => format!("\"{}\"", format!("{:.6}", v.iter().format(", "))),
+            Value::Float(v) => write!(f, "{}", GPoint(*v)),
+            Value::FloatGroup(v) => write!(
+                f,
+                "\"{}\"",
+                format!("{}", v.iter().map(|x| GPoint(*x)).format(", "))
+            ),
         }
     }
+}
 
+impl Value {
     /// Convert [`Value::Float`] to `f64` or panic
     pub fn float(&self) -> f64 {
         if let Value::Float(v) = self {
-            v.clone()
+            *v
         } else {
             panic!("Not a float")
         }
@@ -179,7 +198,7 @@ impl Value {
     /// Convert [`Value::Bool`] to `bool` or panic
     pub fn bool(&self) -> bool {
         if let Value::Bool(v) = self {
-            v.clone()
+            *v
         } else {
             panic!("Not a bool")
         }
